@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react-native';
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 import Animated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

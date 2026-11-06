@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, Switch, Text, TextInput, View } from 'react-native';
-import { BrainCircuit, ChevronRight, Info, RotateCcw, ShieldCheck, UserRound } from 'lucide-react-native';
+import { BrainCircuit, ChevronRight, Info, RotateCcw, ShieldCheck, Trash2, UserRound } from 'lucide-react-native';
 
 import { AppButton } from '@/components/common/AppButton';
 import { Card } from '@/components/common/Card';
@@ -18,7 +18,8 @@ import { useAppStore } from '@/store/useAppStore';
 export default function SettingsScreen() {
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
-  const resetData = useAppStore((state) => state.resetData);
+  const clearAllData = useAppStore((state) => state.clearAllData);
+  const loadDemoData = useAppStore((state) => state.loadDemoData);
   const memories = useAppStore((state) => state.memories);
   const entities = useAppStore((state) => state.entities);
   const goals = useAppStore((state) => state.goals);
@@ -154,13 +155,47 @@ export default function SettingsScreen() {
           <PressableScale
             haptic
             onPress={() =>
-              Alert.alert('重置所有数据？', '当前的目标、日程、记忆与图谱都会恢复为初始演示数据，无法撤销。', [
+              Alert.alert(
+                '清空我的数据？',
+                '记忆、目标、日程、事件与对话都会被清空，图谱只剩「我」这一个节点。无法撤销。',
+                [
+                  { text: '取消', style: 'cancel' },
+                  {
+                    text: '清空',
+                    style: 'destructive',
+                    onPress: () => {
+                      clearAllData();
+                      setMemoryVisible(false);
+                      setEditingMemoryId(null);
+                    },
+                  },
+                ],
+              )
+            }
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 4 }}>
+            <Trash2 size={16} color={colors.danger} strokeWidth={1.9} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '500', color: colors.danger }}>清空我的数据</Text>
+              <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 2 }}>
+                从空白图谱重新开始
+              </Text>
+            </View>
+          </PressableScale>
+
+          <View
+            style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.sm }}
+          />
+
+          <PressableScale
+            haptic
+            onPress={() =>
+              Alert.alert('载入演示数据？', '当前数据会被演示数据覆盖，无法撤销。', [
                 { text: '取消', style: 'cancel' },
                 {
-                  text: '重置',
+                  text: '载入',
                   style: 'destructive',
                   onPress: () => {
-                    resetData();
+                    loadDemoData();
                     setMemoryVisible(false);
                     setEditingMemoryId(null);
                   },
@@ -168,11 +203,11 @@ export default function SettingsScreen() {
               ])
             }
             style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 4 }}>
-            <RotateCcw size={16} color={colors.danger} strokeWidth={1.9} />
+            <RotateCcw size={16} color={colors.textSecondary} strokeWidth={1.9} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12.5, fontWeight: '500', color: colors.danger }}>重置演示数据</Text>
+              <Text style={{ fontSize: 12.5, fontWeight: '500', color: colors.text }}>载入演示数据</Text>
               <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 2 }}>
-                恢复到 KnowMe 的初始体验
+                体验完整的目标、日程与图谱样例
               </Text>
             </View>
           </PressableScale>

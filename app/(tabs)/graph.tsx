@@ -31,7 +31,7 @@ export default function GraphScreen() {
   const goals = useAppStore((state) => state.goals);
   const tasks = useAppStore((state) => state.tasks);
   const events = useAppStore((state) => state.events);
-  const resetData = useAppStore((state) => state.resetData);
+  const loadDemoData = useAppStore((state) => state.loadDemoData);
 
   const [filter, setFilter] = useState<GraphFilter>('全部');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -73,7 +73,7 @@ export default function GraphScreen() {
         onPress: () =>
           Alert.alert('重置数据？', '当前添加的目标、任务与记忆都会恢复为演示数据。', [
             { text: '取消', style: 'cancel' },
-            { text: '重置', style: 'destructive', onPress: resetData },
+            { text: '重置', style: 'destructive', onPress: loadDemoData },
           ]),
       },
       { text: '取消', style: 'cancel' },

@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [knowme, main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # 三道门禁：类型 -> 风格 -> 行为。任何一道红都不算完成。
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # 大小写敏感的文件系统（Linux CI / EAS 构建）才是真相，
+      # 只在 Windows 本地能跑通不算数，所以这里必须真的打一次包。
+      - name: Bundle (web)
+        run: npx expo export -p web --output-dir dist-web

@@ -10,7 +10,7 @@ interface QuickActionsProps {
   onReview: () => void;
 }
 
-const ACTIONS: Array<{ key: 'memory' | 'goal' | 'review'; label: string; icon: LucideIcon; color: string; soft: string }> = [
+const ACTIONS: { key: 'memory' | 'goal' | 'review'; label: string; icon: LucideIcon; color: string; soft: string }[] = [
   { key: 'memory', label: '查看我的记忆', icon: Brain, color: colors.brand, soft: colors.brandSoft },
   { key: 'goal', label: '制定新目标', icon: Target, color: colors.success, soft: colors.successSoft },
   { key: 'review', label: '本周复盘', icon: ClipboardCheck, color: '#4CB8C4', soft: '#E6F6F8' },
