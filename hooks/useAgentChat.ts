@@ -57,6 +57,9 @@ export function useAgentChat() {
         memoryId,
         taskIds: response.taskIds,
       };
+      if (response.degraded) {
+        useAppStore.getState().showToast('Agent 服务未连接，已用本地引擎回复', 'info');
+      }
       useAppStore.getState().appendMessage(agentMessage);
     } catch {
       useAppStore.getState().appendMessage({

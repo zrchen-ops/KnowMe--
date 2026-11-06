@@ -17,9 +17,9 @@ import type {
   Task,
 } from '@/types';
 import type { MemoryDraft } from '@/services/ai/types';
-import { formatDuration, nowISO } from '@/utils/date';
+import { addDaysISO, formatDuration, nowISO, startOfWeekISO } from '@/utils/date';
 import { uid } from '@/utils/id';
-import { createSeedData } from './seed';
+import { createEmptyData, createSeedData } from './seed';
 
 export type ToastTone = 'success' | 'info' | 'error';
 
@@ -37,7 +37,7 @@ interface DataState {
   tasks: Task[];
   events: LearningEvent[];
   messages: ChatMessage[];
-  settings: { autoConfirmMemories: boolean; displayName: string };
+  settings: { autoConfirmMemories: boolean; displayName: string; onboarded: boolean };
 }
 
 interface AppActions {
@@ -86,7 +86,14 @@ interface AppActions {
   updateEntity: (id: string, patch: Partial<Pick<Entity, 'name' | 'type' | 'description'>> & { relationType?: string }) => void;
   deleteEntity: (id: string) => void;
   updateSettings: (patch: Partial<DataState['settings']>) => void;
-  resetData: () => void;
+  /** 清空成新用户的空图谱（不只清聊天，也清记忆、目标、日程、事件）。 */
+  clearAllData: () => void;
+  /** 载入内置演示数据，用于体验与演示，会覆盖当前数据。 */
+  loadDemoData: () => void;
+  /** 首次使用的三问引导：写入称呼、当前关注、第一个目标，并标记已完成。 */
+  completeOnboarding: (input: { displayName: string; focus: string; goalTitle: string }) => void;
+  /** 根据进行中的目标生成下周两件事，返回新建的任务数。 */
+  planNextWeek: () => number;
 }
 
 export type AppStore = DataState & AppActions;
@@ -152,35 +159,25 @@ function applyMemory(memory: Memory, state: DataState): ApplyResult {
   let entityId: string | undefined;
   let created = false;
 
-  if (payload?.entityName) {
-    const entityType = payload.entityType ?? entityTypeForMemory(memory.type);
-    const existing = entities.find(
-      (entity) => entity.name === payload.entityName && entity.type === entityType,
-    );
-    if (existing) {
-      entityId = existing.id;
-    } else {
-      const entity: Entity = {
-        id: uid('e'),
-        name: payload.entityName,
-        type: entityType,
-        description: payload.description ?? memory.content,
-        confirmed: true,
-        sourceMemoryId: memory.id,
-        position: nodePosition(entities, entities.length),
-        createdAt: now,
-        updatedAt: now,
-      };
-      entities.push(entity);
-      entityId = entity.id;
-      created = true;
-    }
-  }
-
+  // 先解析目标，再解析节点：这样「同一目标的第二次表达」能复用已有节点，
+  // 而不是又长出一个名字相近的重复节点（P1-2）。
   if (payload?.goal) {
-    const existingGoa = goals.find((goal) => goal.sourceMemoryId === memory.id);
-    if (existingGoa) {
-      goalId = existingGoa.id;
+    const sameMemory = goals.find((goal) => goal.sourceMemoryId === memory.id);
+    const similar = sameMemory ?? findGoalByTitle(goals, payload.goal.title);
+    if (similar) {
+      goalId = similar.id;
+      // 只有「来自另一条记忆」时才视为更新；同一记忆的重复确认保持幂等。
+      if (!sameMemory) {
+        const index = goals.findIndex((goal) => goal.id === similar.id);
+        if (index >= 0) {
+          goals[index] = {
+            ...goals[index],
+            description: payload.goal.description || goals[index].description,
+            deadline: payload.goal.deadline || goals[index].deadline,
+            updatedAt: now,
+          };
+        }
+      }
     } else {
       const goal: Goal = {
         id: uid('g'),
@@ -200,6 +197,32 @@ function applyMemory(memory: Memory, state: DataState): ApplyResult {
       };
       goals.push(goal);
       goalId = goal.id;
+      created = true;
+    }
+  }
+
+  if (payload?.entityName) {
+    const entityType = payload.entityType ?? entityTypeForMemory(memory.type);
+    const existing =
+      entities.find(
+        (entity) => entity.name === payload.entityName && entity.type === entityType,
+      ) ?? (goalId ? entities.find((entity) => entity.goalId === goalId) : undefined);
+    if (existing) {
+      entityId = existing.id;
+    } else {
+      const entity: Entity = {
+        id: uid('e'),
+        name: payload.entityName,
+        type: entityType,
+        description: payload.description ?? memory.content,
+        confirmed: true,
+        sourceMemoryId: memory.id,
+        position: nodePosition(entities, entities.length),
+        createdAt: now,
+        updatedAt: now,
+      };
+      entities.push(entity);
+      entityId = entity.id;
       created = true;
     }
   }
@@ -287,12 +310,13 @@ function applyMemory(memory: Memory, state: DataState): ApplyResult {
   return { entities, relations, goals, tasks, events, goalId, taskId, created };
 }
 
-const seed = createSeedData();
+// 新用户从空白开始；演示数据不再作为初始状态（P1-4）。
+const initial = createEmptyData();
 
 export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
-      ...seed,
+      ...initial,
       hydrated: false,
       typing: false,
       toast: null,
@@ -588,9 +612,17 @@ export const useAppStore = create<AppStore>()(
         const entityIds = new Set(
           state.entities.filter((entity) => entity.goalId === id).map((entity) => entity.id),
         );
+        // 目标被删掉后它自己的来源记忆也失去依托，必须一并清理，
+        // 否则记忆列表会留下一条点不进图谱的「幽灵记忆」（P1-3）。
+        const memoryIds = new Set(
+          state.goals
+            .filter((goal) => goal.id === id && goal.sourceMemoryId)
+            .map((goal) => goal.sourceMemoryId as string),
+        );
         set({
           goals: state.goals.filter((goal) => goal.id !== id),
           entities: state.entities.filter((entity) => entity.goalId !== id),
+          memories: state.memories.filter((memory) => !memoryIds.has(memory.id)),
           relations: state.relations.filter(
             (relation) =>
               !entityIds.has(relation.sourceId) && !entityIds.has(relation.targetId),
@@ -1032,10 +1064,139 @@ export const useAppStore = create<AppStore>()(
 
       updateSettings: (patch) => set((state) => ({ settings: { ...state.settings, ...patch } })),
 
-      resetData: () => {
-        const fresh = createSeedData();
-        set({ ...fresh, typing: false, toast: null });
-        get().showToast('已恢复演示数据', 'info');
+      clearAllData: () => {
+        set({ ...createEmptyData(), typing: false, toast: null, hydrated: true });
+        get().showToast('已清空，从空白图谱重新开始', 'info');
+      },
+
+      loadDemoData: () => {
+        set({ ...createSeedData(), typing: false, toast: null, hydrated: true });
+        get().showToast('已载入演示数据', 'info');
+      },
+
+      completeOnboarding: ({ displayName, focus, goalTitle }) => {
+        const state = get();
+        const now = nowISO();
+        const drafts: MemoryDraft[] = [];
+
+        if (focus.trim()) {
+          const text = focus.trim();
+          drafts.push({
+            content: `我最近在忙：${text}`,
+            type: 'interest',
+            confidence: 1,
+            origin: 'user',
+            source: '首次使用 · 自我介绍',
+            payload: {
+              entityName: text.slice(0, 20),
+              entityType: 'interest',
+              relationType: '关注',
+              description: text,
+            },
+          });
+        }
+
+        if (goalTitle.trim()) {
+          const title = goalTitle.trim().slice(0, 24);
+          drafts.push({
+            content: `我想${title}`,
+            type: 'goal',
+            confidence: 1,
+            origin: 'user',
+            source: '首次使用 · 自我介绍',
+            payload: {
+              entityName: title,
+              entityType: 'goal',
+              relationType: '拥有目标',
+              description: title,
+              goal: {
+                title,
+                description: title,
+                deadline: addDaysISO(nowISO().slice(0, 10), 90),
+                milestones: [],
+              },
+            },
+          });
+        }
+
+        // 逐步投影：每条记忆都要经过同一个 applyMemory，保证图谱/成长与对话路径一致。
+        let working = state;
+        for (const draft of drafts) {
+          const memory: Memory = {
+            id: uid('m'),
+            content: draft.content,
+            type: draft.type,
+            source: draft.source,
+            confidence: draft.confidence,
+            status: 'confirmed',
+            origin: draft.origin,
+            payload: draft.payload,
+            createdAt: now,
+            updatedAt: now,
+          };
+          const result = applyMemory(memory, working);
+          working = {
+            ...working,
+            memories: [...working.memories, memory],
+            entities: result.entities,
+            relations: result.relations,
+            goals: result.goals,
+            tasks: result.tasks,
+            events: result.events,
+          };
+        }
+
+        set({
+          memories: working.memories,
+          entities: working.entities,
+          relations: working.relations,
+          goals: working.goals,
+          tasks: working.tasks,
+          events: working.events,
+          settings: {
+            ...state.settings,
+            displayName: displayName.trim() || state.settings.displayName,
+            onboarded: true,
+          },
+        });
+        get().showToast(
+          drafts.length > 0 ? '开始了，我已经记下这些' : '好的，随时可以告诉我你的第一件事',
+          'success',
+        );
+      },
+
+      planNextWeek: () => {
+        const state = get();
+        const now = nowISO();
+        const nextMonday = addDaysISO(startOfWeekISO(), 7);
+        const activeGoal = state.goals.find((goal) => goal.status === 'active');
+
+        const plans = activeGoal
+          ? [
+              { title: `${activeGoal.title} · 推进第一步`, date: nextMonday, startTime: '19:00', goalId: activeGoal.id },
+              { title: `${activeGoal.title} · 周末复盘`, date: addDaysISO(nextMonday, 5), startTime: '10:00', goalId: activeGoal.id },
+            ]
+          : [
+              { title: '写下本周最重要的一件事', date: nextMonday, startTime: '19:00', goalId: undefined },
+              { title: '给自己留两段整块时间', date: addDaysISO(nextMonday, 5), startTime: '10:00', goalId: undefined },
+            ];
+
+        const tasks: Task[] = plans.map((plan) => ({
+          id: uid('t'),
+          title: plan.title,
+          date: plan.date,
+          startTime: plan.startTime,
+          duration: 1.5,
+          status: 'todo',
+          goalId: plan.goalId,
+          source: 'user',
+          createdAt: now,
+          updatedAt: now,
+        }));
+
+        set({ tasks: [...state.tasks, ...tasks] });
+        get().showToast(`已把 ${tasks.length} 件事排进下周`, 'success');
+        return tasks.length;
       },
     }),
     {

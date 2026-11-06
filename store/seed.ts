@@ -17,7 +17,7 @@ export interface SeedData {
   tasks: Task[];
   events: LearningEvent[];
   messages: ChatMessage[];
-  settings: { autoConfirmMemories: boolean; displayName: string };
+  settings: { autoConfirmMemories: boolean; displayName: string; onboarded: boolean };
 }
 
 export function createSeedData(): SeedData {
@@ -570,6 +570,44 @@ export function createSeedData(): SeedData {
     tasks,
     events,
     messages,
-    settings: { autoConfirmMemories: false, displayName: '知我' },
+    settings: { autoConfirmMemories: false, displayName: '知我', onboarded: true },
+  };
+}
+
+/**
+ * 新用户的起点：只有「我」这一个中心节点和一条欢迎消息。
+ * 演示数据（createSeedData）只在用户主动选择「载入演示数据」时使用，
+ * 避免新用户首次打开就看到别人的记忆。
+ */
+export function createEmptyData(): SeedData {
+  const createdAt = nowISO();
+  return {
+    memories: [],
+    entities: [
+      {
+        id: 'e-self',
+        name: '我',
+        type: 'self',
+        description: '图谱的中心：你说过的目标、经历和人，都会连到这里。',
+        confirmed: true,
+        position: { x: 180, y: 240 },
+        createdAt,
+        updatedAt: createdAt,
+      },
+    ],
+    relations: [],
+    goals: [],
+    tasks: [],
+    events: [],
+    messages: [
+      {
+        id: 'msg-welcome',
+        role: 'agent',
+        text: '你好，我是 KnowMe。先从一句话开始：告诉我一个想实现的目标，或者说说你最近在做什么。我会先整理成记忆，等你确认后再写进图谱。',
+        kind: 'text',
+        createdAt,
+      },
+    ],
+    settings: { autoConfirmMemories: false, displayName: '同学', onboarded: false },
   };
 }

@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 
 import { colors } from '@/constants/colors';
 import { radius } from '@/constants/theme';

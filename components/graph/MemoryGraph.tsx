@@ -16,12 +16,12 @@ import { radius } from '@/constants/theme';
 import {
   GRAPH_HEIGHT,
   GRAPH_WIDTH,
+  matchesFilter,
   nodeRadius,
   shortEntityName,
+  type GraphFilter,
 } from '@/services/graph/layout';
 import type { Entity, Relation } from '@/types';
-import type { GraphFilter } from '@/services/graph/layout';
-import { matchesFilter } from '@/services/graph/layout';
 
 interface MemoryGraphProps {
   entities: Entity[];
@@ -219,7 +219,6 @@ export function MemoryGraph({
               const isSelf = entity.type === 'self';
               const isSelected = entity.id === selectedId;
               const r = nodeRadius(entity.type);
-              const lines = linesFor(entity.name);
               return (
                 <G key={entity.id}>
                   <Circle

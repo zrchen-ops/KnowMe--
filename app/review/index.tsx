@@ -23,6 +23,7 @@ export default function ReviewScreen() {
   const events = useAppStore((state) => state.events);
   const tasks = useAppStore((state) => state.tasks);
   const goals = useAppStore((state) => state.goals);
+  const planNextWeek = useAppStore((state) => state.planNextWeek);
 
   const stats = computeGrowthStats(events, tasks, goals);
   const summary = buildWeeklySummary(stats, goals);
@@ -318,6 +319,22 @@ export default function ReviewScreen() {
               </View>
             ))
           )}
+        </Card>
+
+        <Card style={{ gap: 10 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: colors.text }}>把复盘变成下周动作</Text>
+          <Text style={{ fontSize: 11.5, color: colors.textSecondary, lineHeight: 18 }}>
+            {activeGoals.length > 0
+              ? `围绕「${activeGoals[0].title}」排两件事：周中推进一步，周末做一次复盘。`
+              : '还没有进行中的目标。可以先写下一个目标，再让它自动排进下周。'}
+          </Text>
+          <AppButton
+            label="生成下周计划"
+            onPress={() => {
+              const count = planNextWeek();
+              if (count > 0) router.push('/growth');
+            }}
+          />
         </Card>
 
         <AppButton label="回到成长" variant="secondary" onPress={() => router.back()} />

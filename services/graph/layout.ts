@@ -17,7 +17,7 @@ export function nodeRadius(type: EntityType): number {
   return RADIUS[type] ?? 27;
 }
 
-const SLOTS: Array<{ x: number; y: number }> = [
+const SLOTS: { x: number; y: number }[] = [
   { x: 286, y: 112 },
   { x: 68, y: 138 },
   { x: 304, y: 312 },

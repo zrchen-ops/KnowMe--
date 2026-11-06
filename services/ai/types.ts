@@ -1,4 +1,4 @@
-import type { ChatKind, Entity, Goal, LearningEvent, Memory, MemoryPayload, MemoryType, MemoryOrigin, Task } from '@/types';
+import type { ChatKind, Entity, Goal, LearningEvent, Memory, MemoryOrigin, MemoryPayload, MemoryType, Task } from '@/types';
 
 export interface AgentContext {
   memories: Memory[];
@@ -22,6 +22,10 @@ export interface AgentResponse {
   kind: ChatKind;
   memoryDraft?: MemoryDraft;
   taskIds?: string[];
+  /** 服务端实际使用的 provider（stub / deepseek / openai / mock）。 */
+  provider?: string;
+  /** 远端不可用、本条回复由本地规则引擎兜底产生。 */
+  degraded?: boolean;
 }
 
 export interface AgentService {
